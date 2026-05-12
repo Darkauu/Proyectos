@@ -574,7 +574,13 @@ async function doSetPassword(){
   btn.textContent='Guardando...'; btn.disabled=true;
 
   try {
-    // For invite links, use updateUser to set the password (session is already active from the invite token)
+    // Verify we have a valid session from the invite token
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session){
+      throw new Error('Sesión expirada. Solicita una nueva invitación.');
+    }
+
+    // For invite links, use updateUser to set the password
     const { data, error } = await sb.auth.updateUser({ password: p1 });
 
     if(error) throw error;
@@ -1179,21 +1185,41 @@ async function deleteCurrentDept(){
    INIT
 ══════════════════════════════════════════ */
 (async()=>{
-  // Detect invite link hash BEFORE SDK consumes it
-  const hashStr=window.location.hash;
-  const isInvite=hashStr.includes('type=invite')||hashStr.includes('type=recovery');
+  // Detect invite/recovery link hash BEFORE SDK consumes it
+  const hashStr = window.location.hash;
+  const isInviteOrRecovery = hashStr.includes('type=invite') || hashStr.includes('type=recovery');
 
-  sb.auth.onAuthStateChange(async(event, session)=>{
-    if(event==='SIGNED_IN' && isInvite){
-      const meta=session.user.user_metadata||{};
-      if(!meta.password_set){
-        showScreen('screen-setpass'); return;
-      }
+  // If we have an invite/recovery token in the URL, let the SDK exchange it first
+  if(isInviteOrRecovery){
+    // Wait for the SDK to process the hash and establish session
+    const { data, error } = await sb.auth.getSession();
+
+    if(error){
+      console.error('Error processing invite token:', error);
+      showScreen('screen-login');
+      return;
     }
-    if(event==='SIGNED_OUT'){ currentUser=null; showScreen('screen-login'); }
+
+    if(data.session){
+      // Clear the hash from URL to prevent re-processing on refresh
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+
+      // Show password setup screen for invite links
+      showScreen('screen-setpass');
+      return;
+    }
+  }
+
+  // Normal auth state change listener for regular sign-in/sign-out
+  sb.auth.onAuthStateChange(async(event, session)=>{
+    if(event==='SIGNED_OUT'){
+      currentUser = null;
+      showScreen('screen-login');
+    }
   });
 
-  const { data:{ session } }=await sb.auth.getSession();
+  // Check for existing session (normal login flow)
+  const { data:{ session } } = await sb.auth.getSession();
   if(session){
     await onLogin(session.user);
   } else {
