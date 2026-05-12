@@ -2,7 +2,7 @@
   "name": "Proyectos — Seguimiento",
   "short_name": "Proyectos",
   "description": "Seguimiento y registro de proyectos por departamento",
-  "start_url": "./proyectos.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f1117",
