@@ -573,33 +573,26 @@ async function doSetPassword(){
   err.classList.remove('show');
   btn.textContent='Guardando...'; btn.disabled=true;
 
-  // Get current session to retrieve email before updating
   const { data:{ session:currentSession } } = await sb.auth.getSession();
   const userEmail = currentSession?.user?.email;
 
   const { error } = await sb.auth.updateUser({ password:p1, data:{ password_set:true } });
-  btn.textContent='Guardar y entrar →'; btn.disabled=false;
 
-  if(error){
-    // Supabase throws this when the new password equals the temporary one from the invite link.
-    // Solution: sign in directly with the password the user just typed.
-    if(error.message.toLowerCase().includes('different from the old password') || error.message.toLowerCase().includes('same password')){
-      if(!userEmail){ err.textContent='No se pudo obtener el email. Intenta iniciar sesión manualmente.'; err.classList.add('show'); return; }
-      const { data:signInData, error:signInError } = await sb.auth.signInWithPassword({ email:userEmail, password:p1 });
-      if(signInError){ err.textContent='La contraseña ya estaba en uso. Intenta con otra.'; err.classList.add('show'); return; }
-      await onLogin(signInData.user);
-      return;
-    }
+  if(error && !error.message.toLowerCase().includes('different from the old password') && !error.message.toLowerCase().includes('same password')){
+    btn.textContent='Guardar y entrar →'; btn.disabled=false;
     err.textContent=error.message; err.classList.add('show'); return;
   }
 
-  // Password updated — sign in fresh to get clean session
+  // Always sign in with the new password — this guarantees redirect regardless of updateUser result
   if(userEmail){
-    const { data:signInData } = await sb.auth.signInWithPassword({ email:userEmail, password:p1 });
-    if(signInData?.user){ await onLogin(signInData.user); return; }
+    const { data:signInData, error:signInError } = await sb.auth.signInWithPassword({ email:userEmail, password:p1 });
+    if(!signInError && signInData?.user){
+      await onLogin(signInData.user); return;
+    }
   }
-  const { data:{ session } } = await sb.auth.getSession();
-  if(session) await onLogin(session.user);
+
+  btn.textContent='Guardar y entrar →'; btn.disabled=false;
+  err.textContent='Contraseña guardada. Inicia sesión manualmente.'; err.classList.add('show');
 }
 
 async function onLogin(user){
