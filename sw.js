@@ -1,6 +1,6 @@
 const CACHE = 'proyectos-v1';
 const ASSETS = [
-  './proyectos.html',
+  './index.html',
   './manifest.json'
 ];
 
