@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Proyectos">
+<meta name="theme-color" content="#0f1117">
+<link rel="manifest" href="manifest.json">
+<title>Proyectos — Seguimiento</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1117;--bg2:#161a24;--bg3:#1e2330;--bg4:#252c3d;
+  --border:#2a3145;--border2:#3a4460;
+  --text:#e8eaf2;--text2:#8892aa;--text3:#4a5470;
+  --accent:#5b8def;--accent2:#3d6ad6;--accent-dim:#1a2f5a;
+  --success:#3dd68c;--success-dim:#0f3d26;
+  --warn:#f5a623;--warn-dim:#3d2a0a;
+  --danger:#e05454;--danger-dim:#3d1414;
+  --pause:#a855f7;--pause-dim:#2a1245;
+  --radius:10px;--radius-lg:14px;--radius-xl:20px;
+  --mono:'DM Mono',monospace;--sans:'Sora',sans-serif;
+  --topbar:52px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans)}
+button{font-family:var(--sans);cursor:pointer;border:none;background:none;color:inherit}
+input,textarea,select{font-family:var(--sans);color:var(--text);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-size:14px;width:100%;outline:none;transition:border .2s}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:80px;line-height:1.5}
+select option{background:var(--bg3)}
+a{color:var(--accent);text-decoration:none}
+
+/* ── SCREENS ── */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .25s}
+.screen.active{opacity:1;pointer-events:all}
+
+/* ── TOPBAR ── */
+.topbar{height:var(--topbar);display:flex;align-items:center;padding:0 16px;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)}
+.topbar-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.12em;color:var(--accent)}
+.topbar-title{font-size:15px;font-weight:500;flex:1}
+.btn-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);transition:all .15s}
+.btn-icon:active{transform:scale(.93)}
+.btn-back{background:none;border:none}
+
+/* ── SCROLL BODY ── */
+.scroll-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px}
+.scroll-body::-webkit-scrollbar{display:none}
+
+/* ── LOGIN ── */
+.login-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:24px}
+.login-logo{font-family:var(--mono);font-size:26px;font-weight:500;letter-spacing:.18em;color:var(--accent)}
+.login-sub{font-family:var(--mono);font-size:11px;color:var(--text3);letter-spacing:.1em}
+.login-card{width:100%;max-width:340px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-xl);padding:28px 24px;display:flex;flex-direction:column;gap:16px}
+.login-title{font-size:16px;font-weight:500;margin-bottom:4px}
+.login-footer{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.08em}
+.login-error{font-family:var(--mono);font-size:11px;color:var(--danger);display:none;text-align:center}
+.login-error.show{display:block}
+
+/* ── FIELD GROUP ── */
+.fgroup{display:flex;flex-direction:column;gap:6px}
+.flabel{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--text3)}
+
+/* ── BUTTONS ── */
+.btn-primary{background:var(--accent);color:#fff;border-radius:var(--radius);padding:11px 20px;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;border:none;width:100%}
+.btn-primary:active{background:var(--accent2);transform:scale(.97)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;transition:all .15s}
+.btn-secondary:active{background:var(--bg4);transform:scale(.97)}
+.btn-danger{background:var(--danger-dim);color:var(--danger);border:1px solid var(--danger);border-radius:var(--radius);padding:10px 16px;font-size:13px;font-weight:500}
+
+/* ── STATUS BADGE ── */
+.badge{font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:3px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.badge.activo{background:var(--success-dim);color:var(--success);border:1px solid rgba(61,214,140,.2)}
+.badge.pausado{background:var(--pause-dim);color:var(--pause);border:1px solid rgba(168,85,247,.2)}
+.badge.completado{background:var(--bg4);color:var(--text2);border:1px solid var(--border)}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* ── HOME ── */
+.dept-header{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--text3);padding:4px 0 10px;text-transform:uppercase}
+.dept-selector-row{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.dept-chip{font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:5px 14px;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.dept-chip.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.dept-chip:active{transform:scale(.95)}
+
+/* ── PROJECT CARD ── */
+.proj-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;display:flex;flex-direction:column;gap:10px;cursor:pointer;transition:all .15s;margin-bottom:10px}
+.proj-card:active{background:var(--bg3);transform:scale(.98)}
+.proj-card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.proj-name{font-size:15px;font-weight:500;line-height:1.3}
+.proj-desc{font-size:13px;color:var(--text2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.proj-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.proj-meta-item{font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px}
+
+/* ── FAB ── */
+.fab{position:fixed;bottom:24px;right:20px;width:52px;height:52px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 20px rgba(91,141,239,.4);transition:all .2s;z-index:10;border:none;color:#fff}
+.fab:active{transform:scale(.9)}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:48px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.empty-icon{font-size:40px;opacity:.3}
+.empty-title{font-size:15px;font-weight:500;color:var(--text2)}
+.empty-sub{font-size:13px;color:var(--text3);line-height:1.5}
+
+/* ── MODAL ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:flex;flex-direction:column;justify-content:flex-end;opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-backdrop.show{opacity:1;pointer-events:all}
+.modal{background:var(--bg2);border-radius:var(--radius-xl) var(--radius-xl) 0 0;border-top:1px solid var(--border);padding:0;max-height:90vh;display:flex;flex-direction:column;transform:translateY(20px);transition:transform .25s}
+.modal-backdrop.show .modal{transform:translateY(0)}
+.modal-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
+.modal-header{padding:14px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-title{font-size:15px;font-weight:500}
+.modal-body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+.modal-body::-webkit-scrollbar{display:none}
+.modal-footer{padding:16px 20px;border-top:1px solid var(--border);flex-shrink:0}
+
+/* ── PROJECT DETAIL ── */
+.entry-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
+.entry-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.entry-ts{font-family:var(--mono);font-size:10px;color:var(--text3);line-height:1.5}
+.entry-content{font-size:14px;line-height:1.6;color:var(--text);white-space:pre-wrap}
+.attachment-row{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;transition:all .15s}
+.attachment-row:active{background:var(--bg4)}
+.attachment-icon{font-size:18px;flex-shrink:0}
+.attachment-name{font-family:var(--mono);font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attachment-size{font-family:var(--mono);font-size:10px;color:var(--text3);flex-shrink:0}
+.attach-list{display:flex;flex-direction:column;gap:6px}
+
+/* ── STATUS TAG on entry ── */
+.entry-actions{display:flex;gap:6px;margin-top:2px}
+.btn-sm{font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);cursor:pointer;transition:all .15s}
+.btn-sm:active{background:var(--bg4)}
+.btn-sm.danger{color:var(--danger);border-color:var(--danger);background:var(--danger-dim)}
+
+/* ── TOAST ── */
+.toast-wrap{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{font-family:var(--mono);font-size:12px;background:var(--bg4);border:1px solid var(--border2);border-radius:24px;padding:8px 18px;color:var(--text);opacity:0;transition:all .3s;white-space:nowrap}
+.toast.success{border-color:var(--success);color:var(--success)}
+.toast.danger{border-color:var(--danger);color:var(--danger)}
+.toast.show{opacity:1}
+
+/* ── SYNC DOT ── */
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--border2);transition:background .3s;flex-shrink:0}
+.sync-dot.syncing{background:var(--warn);animation:pulse .8s infinite}
+.sync-dot.synced{background:var(--success)}
+.sync-dot.error{background:var(--danger)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── USER CHIP ── */
+.user-chip{font-family:var(--mono);font-size:10px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── FILE UPLOAD ── */
+.upload-zone{border:1.5px dashed var(--border2);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;color:var(--text3);font-size:13px;transition:all .2s}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+
+/* ── STATUS SELECT ── */
+.status-row{display:flex;gap:8px}
+.status-opt{flex:1;border:1px solid var(--border);border-radius:8px;padding:9px 6px;text-align:center;cursor:pointer;font-family:var(--mono);font-size:11px;transition:all .15s;color:var(--text2)}
+.status-opt[data-val="activo"].selected{background:var(--success-dim);border-color:var(--success);color:var(--success)}
+.status-opt[data-val="pausado"].selected{background:var(--pause-dim);border-color:var(--pause);color:var(--pause)}
+.status-opt[data-val="completado"].selected{background:var(--bg4);border-color:var(--border2);color:var(--text2)}
+
+/* ── SKELETON ── */
+.skeleton{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius)}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-card{height:90px;margin-bottom:10px}
+.skel-entry{height:80px;margin-bottom:10px}
+
+/* ── PROJ STATUS LINE ── */
+.proj-status-bar{height:3px;border-radius:2px;width:100%;background:var(--border)}
+.proj-status-bar.activo{background:var(--success)}
+.proj-status-bar.pausado{background:var(--pause)}
+.proj-status-bar.completado{background:var(--border2)}
+</style>
+</head>
+<body>
+
+<!-- ══════════ TOAST ══════════ -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- ══════════ SCREEN: LOGIN ══════════ -->
+<div class="screen active" id="screen-login">
+  <div class="topbar"><span class="topbar-logo">PROYECTOS</span></div>
+  <div class="login-wrap">
+    <div class="login-logo">PROYECTOS</div>
+    <div class="login-sub">// SEGUIMIENTO DE PROYECTOS</div>
+    <div class="login-card">
+      <div class="login-title">Iniciar sesión</div>
+      <div class="fgroup">
+        <label class="flabel">EMAIL</label>
+        <input id="login-email" type="email" placeholder="usuario@empresa.com" autocomplete="email">
+      </div>
+      <div class="fgroup">
+        <label class="flabel">CONTRASEÑA</label>
+        <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="btn-primary" id="login-btn" onclick="doLogin()">Entrar →</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+    <div class="login-footer">acceso solo por invitación</div>
+  </div>
+</div>
+
+<!-- ══════════ SCREEN: SET PASSWORD ══════════ -->
+<div class="screen" id="screen-setpass">
+  <div class="topbar"><span class="topbar-logo">PROYECTOS</span></div>
+  <div class="login-wrap">
+    <div class="login-logo">PROYECTOS</div>
+    <div class="login-sub">// PRIMERA VEZ</div>
+    <div class="login-card">
+      <div class="login-title">Crear contraseña</div>
+      <p style="font-family:var(--mono);font-size:11px;color:var(--text3);line-height:1.6">Bienvenido. Crea una contraseña para acceder en el futuro.</p>
+      <div class="fgroup">
+        <label class="flabel">CONTRASEÑA</label>
+        <input id="sp-p1" type="password" placeholder="mínimo 8 caracteres">
+      </div>
+      <div class="fgroup">
+        <label class="flabel">CONFIRMAR</label>
+        <input id="sp-p2" type="password" placeholder="repite tu contraseña" onkeydown="if(event.key==='Enter')doSetPassword()">
+      </div>
+      <button class="btn-primary" id="sp-btn" onclick="doSetPassword()">Guardar y entrar →</button>
+      <div class="login-error" id="sp-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ SCREEN: HOME ══════════ -->
+<div class="screen" id="screen-home">
+  <div class="topbar">
+    <span class="topbar-logo">PROYECTOS</span>
+    <span style="flex:1"></span>
+    <div class="sync-dot" id="sync-dot" title="Sincronización"></div>
+    <div class="user-chip" id="user-chip" onclick="confirmLogout()">...</div>
+  </div>
+  <div class="scroll-body" id="home-body">
+    <!-- dept chips + project list rendered here -->
+  </div>
+  <button class="fab" id="fab-new-proj" onclick="openProjModal()">+</button>
+</div>
+
+<!-- ══════════ SCREEN: PROJECT DETAIL ══════════ -->
+<div class="screen" id="screen-proj">
+  <div class="topbar">
+    <button class="btn-icon btn-back" onclick="showScreen('screen-home')" style="font-size:20px">←</button>
+    <div style="flex:1;overflow:hidden">
+      <div class="topbar-title" id="proj-detail-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <div id="proj-detail-dept" style="font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.06em"></div>
+    </div>
+    <button class="btn-icon" onclick="openEditProjModal()" style="font-size:15px">✎</button>
+    <div class="sync-dot" id="sync-dot-proj"></div>
+  </div>
+  <div class="scroll-body" id="proj-body">
+    <!-- entries rendered here -->
+  </div>
+  <button class="fab" onclick="openEntryModal()">+</button>
+</div>
+
+<!-- ══════════ MODAL: PROJECT CRUD ══════════ -->
+<div class="modal-backdrop" id="modal-proj">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="proj-modal-title">Nuevo proyecto</div>
+      <button class="btn-icon" onclick="closeProjModal()" style="font-size:18px">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label class="flabel">NOMBRE DEL PROYECTO</label>
+        <input id="pm-name" placeholder="Ej: Implementación ERP">
+      </div>
+      <div class="fgroup">
+        <label class="flabel">DESCRIPCIÓN</label>
+        <textarea id="pm-desc" placeholder="Breve descripción del proyecto..."></textarea>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">DEPARTAMENTO</label>
+        <select id="pm-dept">
+          <option value="">Seleccionar departamento</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">ESTADO</label>
+        <div class="status-row">
+          <div class="status-opt selected" data-val="activo" onclick="selectStatus(this)">● Activo</div>
+          <div class="status-opt" data-val="pausado" onclick="selectStatus(this)">◉ Pausado</div>
+          <div class="status-opt" data-val="completado" onclick="selectStatus(this)">○ Completado</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:10px">
+      <button class="btn-danger" id="pm-delete-btn" onclick="deleteCurrentProj()" style="display:none">Eliminar</button>
+      <button class="btn-primary" id="pm-save-btn" onclick="saveProject()">Guardar proyecto</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: NUEVA ENTRADA ══════════ -->
+<div class="modal-backdrop" id="modal-entry">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Nueva entrada</div>
+      <button class="btn-icon" onclick="closeEntryModal()" style="font-size:18px">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label class="flabel">DESCRIPCIÓN / NOTAS</label>
+        <textarea id="em-content" placeholder="¿Qué hiciste con este proyecto hoy? Anota detalles, acuerdos, próximos pasos..." style="min-height:120px"></textarea>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">ADJUNTAR ARCHIVOS (opcional)</label>
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event)">
+          📎 Toca para adjuntar o arrastra archivos aquí
+        </div>
+        <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this.files)">
+        <div id="file-preview-list" style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" id="em-save-btn" onclick="saveEntry()">Guardar entrada</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: CONFIRM ══════════ -->
+<div class="modal-backdrop" id="modal-confirm">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="confirm-title">¿Confirmar?</div>
+      <button class="btn-icon" onclick="closeConfirm()" style="font-size:18px">✕</button>
+    </div>
+    <div class="modal-body"><p id="confirm-msg" style="font-size:14px;color:var(--text2);line-height:1.6"></p></div>
+    <div class="modal-footer" style="display:flex;gap:10px">
+      <button class="btn-secondary" onclick="closeConfirm()" style="flex:1;justify-content:center">Cancelar</button>
+      <button class="btn-danger" id="confirm-ok-btn" style="flex:1;justify-content:center">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   CONFIG — reemplazar con tus credenciales
+══════════════════════════════════════════ */
+const SUPABASE_URL = 'https://jprezhsqtdnybmxpnaav.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwcmV6aHNxdGRueWJteHBuYWF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzMzNTIsImV4cCI6MjA5MzU0OTM1Mn0.8hcirTUfQhVp1QE78K3Famw_TAreP3xqzMmoK3d-MM8';
+const STORAGE_BUCKET = 'project-attachments';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
+});
+
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+let currentUser = null;
+let STATE = {
+  departments: [],
+  projects: [],
+  activeDept: null,
+  currentProj: null,
+  entries: {},        // keyed by project_id
+  pendingFiles: []
+};
+
+/* ══════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════ */
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7) }
+
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-PA',{day:'2-digit',month:'short',year:'numeric'})+
+    ' · '+d.toLocaleTimeString('es-PA',{hour:'2-digit',minute:'2-digit'});
+}
+
+function fmtSize(bytes){
+  if(bytes<1024) return bytes+'B';
+  if(bytes<1048576) return (bytes/1024).toFixed(1)+'KB';
+  return (bytes/1048576).toFixed(1)+'MB';
+}
+
+function fileIcon(mime){
+  if(!mime) return '📄';
+  if(mime.startsWith('image/')) return '🖼';
+  if(mime.includes('pdf')) return '📕';
+  if(mime.includes('word')||mime.includes('document')) return '📝';
+  if(mime.includes('sheet')||mime.includes('excel')) return '📊';
+  if(mime.includes('zip')||mime.includes('rar')) return '🗜';
+  if(mime.startsWith('video/')) return '🎬';
+  if(mime.startsWith('audio/')) return '🎵';
+  return '📄';
+}
+
+/* ══════════════════════════════════════════
+   UI HELPERS
+══════════════════════════════════════════ */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function setSyncDot(state){ // 'syncing'|'synced'|'error'|'idle'
+  ['sync-dot','sync-dot-proj'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.className='sync-dot '+state;
+  });
+}
+
+function toast(msg, type=''){
+  const wrap=document.getElementById('toast-wrap');
+  const el=document.createElement('div');
+  el.className='toast '+type;
+  el.textContent=msg;
+  wrap.appendChild(el);
+  requestAnimationFrame(()=>{ el.classList.add('show'); });
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),400); }, 2800);
+}
+
+function showModal(id){ document.getElementById(id).classList.add('show') }
+function hideModal(id){ document.getElementById(id).classList.remove('show') }
+
+let confirmResolve = null;
+function openConfirm(title, msg){
+  return new Promise(res=>{
+    confirmResolve=res;
+    document.getElementById('confirm-title').textContent=title;
+    document.getElementById('confirm-msg').textContent=msg;
+    document.getElementById('confirm-ok-btn').onclick=()=>{ closeConfirm(); res(true); };
+    showModal('modal-confirm');
+  });
+}
+function closeConfirm(){ hideModal('modal-confirm'); if(confirmResolve){ confirmResolve(false); confirmResolve=null; } }
+
+/* ══════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════ */
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-password').value;
+  const btn=document.getElementById('login-btn');
+  const err=document.getElementById('login-error');
+  if(!email||!pass){ err.textContent='Completa todos los campos.'; err.classList.add('show'); return; }
+  btn.textContent='Ingresando...'; btn.disabled=true; err.classList.remove('show');
+  const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
+  btn.textContent='Entrar →'; btn.disabled=false;
+  if(error){ err.textContent=error.message; err.classList.add('show'); return; }
+  await onLogin(data.user);
+}
+
+async function doSetPassword(){
+  const p1=document.getElementById('sp-p1').value;
+  const p2=document.getElementById('sp-p2').value;
+  const btn=document.getElementById('sp-btn');
+  const err=document.getElementById('sp-error');
+  if(p1.length<8){ err.textContent='Mínimo 8 caracteres.'; err.classList.add('show'); return; }
+  if(p1!==p2){ err.textContent='Las contraseñas no coinciden.'; err.classList.add('show'); return; }
+  err.classList.remove('show');
+  btn.textContent='Guardando...'; btn.disabled=true;
+  const { data, error } = await sb.auth.updateUser({ password:p1, data:{ password_set:true } });
+  btn.textContent='Guardar y entrar →'; btn.disabled=false;
+  if(error){ err.textContent=error.message; err.classList.add('show'); return; }
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) await onLogin(session.user);
+}
+
+async function onLogin(user){
+  currentUser=user;
+  const chip=document.getElementById('user-chip');
+  if(chip) chip.textContent=user.email.split('@')[0];
+  showScreen('screen-home');
+  await loadAll();
+}
+
+async function confirmLogout(){
+  const ok = await openConfirm('Cerrar sesión','¿Seguro que quieres salir?');
+  if(!ok) return;
+  await sb.auth.signOut();
+  currentUser=null; STATE={ departments:[],projects:[],activeDept:null,currentProj:null,entries:{},pendingFiles:[] };
+  showScreen('screen-login');
+}
+
+/* ══════════════════════════════════════════
+   LOAD DATA
+══════════════════════════════════════════ */
+async function loadAll(){
+  setSyncDot('syncing');
+  renderHomeSkeleton();
+  try{
+    const [deptRes, projRes] = await Promise.all([
+      sb.from('departments').select('*').order('name'),
+      sb.from('projects').select('*').order('created_at',{ascending:false})
+    ]);
+    if(deptRes.error) throw deptRes.error;
+    if(projRes.error) throw projRes.error;
+    STATE.departments = deptRes.data || [];
+    STATE.projects    = projRes.data || [];
+    if(!STATE.activeDept && STATE.departments.length>0)
+      STATE.activeDept = STATE.departments[0].id;
+    setSyncDot('synced');
+    renderHome();
+  } catch(e){
+    setSyncDot('error');
+    toast('Error cargando datos', 'danger');
+    console.error(e);
+  }
+}
+
+async function loadEntries(projId){
+  setSyncDot('syncing');
+  try{
+    const { data, error } = await sb
+      .from('entries')
+      .select('*, attachments(*)')
+      .eq('project_id', projId)
+      .order('created_at', {ascending:false});
+    if(error) throw error;
+    STATE.entries[projId] = data || [];
+    setSyncDot('synced');
+    renderEntries();
+  } catch(e){
+    setSyncDot('error');
+    toast('Error cargando entradas','danger');
+  }
+}
+
+/* ══════════════════════════════════════════
+   HOME RENDER
+══════════════════════════════════════════ */
+function renderHomeSkeleton(){
+  const body=document.getElementById('home-body');
+  body.innerHTML='<div style="height:44px;display:flex;gap:8px;margin-bottom:16px">'+
+    '<div class="skeleton" style="width:80px;height:30px;border-radius:20px"></div>'.repeat(3)+
+    '</div>'+
+    '<div class="skeleton skel-card"></div>'.repeat(3);
+}
+
+function renderHome(){
+  const body=document.getElementById('home-body');
+  const depts=STATE.departments;
+  const projs=STATE.projects.filter(p=>!STATE.activeDept||p.department_id===STATE.activeDept);
+
+  let html='';
+
+  // dept chips
+  html+='<div class="dept-selector-row" style="overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch">';
+  html+='<span class="dept-chip'+(STATE.activeDept===null?' active':'')+'" onclick="filterDept(null)">Todos</span>';
+  depts.forEach(d=>{
+    html+=`<span class="dept-chip${STATE.activeDept===d.id?' active':''}" onclick="filterDept('${d.id}')">${d.name}</span>`;
+  });
+  html+='</div>';
+
+  // stats row
+  const total=projs.length;
+  const activos=projs.filter(p=>p.status==='activo').length;
+  const completados=projs.filter(p=>p.status==='completado').length;
+  html+=`<div style="display:flex;gap:8px;margin-bottom:16px">
+    <div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;margin-bottom:4px">TOTAL</div>
+      <div style="font-size:22px;font-weight:600">${total}</div>
+    </div>
+    <div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--success);letter-spacing:.08em;margin-bottom:4px">ACTIVOS</div>
+      <div style="font-size:22px;font-weight:600;color:var(--success)">${activos}</div>
+    </div>
+    <div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;margin-bottom:4px">LISTOS</div>
+      <div style="font-size:22px;font-weight:600;color:var(--text2)">${completados}</div>
+    </div>
+  </div>`;
+
+  if(projs.length===0){
+    html+=`<div class="empty">
+      <div class="empty-icon">📁</div>
+      <div class="empty-title">Sin proyectos</div>
+      <div class="empty-sub">Toca el botón + para crear tu primer proyecto en este departamento.</div>
+    </div>`;
+  } else {
+    projs.forEach(p=>{
+      const dept=STATE.departments.find(d=>d.id===p.department_id);
+      const deptName=dept?dept.name:'Sin depto.';
+      const entryCount=(STATE.entries[p.id]||[]).length;
+      html+=`<div class="proj-card" onclick="openProject('${p.id}')">
+        <div class="proj-status-bar ${p.status||'activo'}"></div>
+        <div class="proj-card-header">
+          <div class="proj-name">${escHtml(p.name)}</div>
+          <div class="badge ${p.status||'activo'}"><span class="badge-dot"></span>${p.status||'activo'}</div>
+        </div>
+        ${p.description?`<div class="proj-desc">${escHtml(p.description)}</div>`:''}
+        <div class="proj-meta">
+          <span class="proj-meta-item">🏢 ${escHtml(deptName)}</span>
+          <span class="proj-meta-item">📝 ${entryCount} entrada${entryCount!==1?'s':''}</span>
+          <span class="proj-meta-item">🕐 ${fmtDate(p.created_at)}</span>
+        </div>
+      </div>`;
+    });
+  }
+
+  body.innerHTML=html;
+}
+
+function filterDept(id){
+  STATE.activeDept=id;
+  renderHome();
+}
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+/* ══════════════════════════════════════════
+   PROJECT MODAL (CREATE / EDIT)
+══════════════════════════════════════════ */
+let editingProjId = null;
+let selectedStatus = 'activo';
+
+function openProjModal(){
+  editingProjId=null; selectedStatus='activo';
+  document.getElementById('proj-modal-title').textContent='Nuevo proyecto';
+  document.getElementById('pm-name').value='';
+  document.getElementById('pm-desc').value='';
+  document.getElementById('pm-delete-btn').style.display='none';
+  populateDeptSelect('pm-dept', STATE.activeDept);
+  setStatusUI('activo');
+  showModal('modal-proj');
+  setTimeout(()=>document.getElementById('pm-name').focus(),300);
+}
+
+function openEditProjModal(){
+  const p=STATE.projects.find(x=>x.id===STATE.currentProj);
+  if(!p) return;
+  editingProjId=p.id;
+  document.getElementById('proj-modal-title').textContent='Editar proyecto';
+  document.getElementById('pm-name').value=p.name;
+  document.getElementById('pm-desc').value=p.description||'';
+  document.getElementById('pm-delete-btn').style.display='flex';
+  populateDeptSelect('pm-dept', p.department_id);
+  selectedStatus=p.status||'activo';
+  setStatusUI(selectedStatus);
+  showModal('modal-proj');
+}
+
+function populateDeptSelect(id, selected){
+  const sel=document.getElementById(id);
+  sel.innerHTML='<option value="">Seleccionar departamento</option>';
+  STATE.departments.forEach(d=>{
+    const opt=document.createElement('option');
+    opt.value=d.id; opt.textContent=d.name;
+    if(d.id===selected) opt.selected=true;
+    sel.appendChild(opt);
+  });
+}
+
+function setStatusUI(val){
+  selectedStatus=val;
+  document.querySelectorAll('.status-opt').forEach(el=>{
+    el.classList.toggle('selected', el.dataset.val===val);
+  });
+}
+
+function selectStatus(el){ setStatusUI(el.dataset.val) }
+
+async function saveProject(){
+  const name=document.getElementById('pm-name').value.trim();
+  const desc=document.getElementById('pm-desc').value.trim();
+  const deptId=document.getElementById('pm-dept').value;
+  if(!name){ toast('El nombre es obligatorio','danger'); return; }
+  if(!deptId){ toast('Selecciona un departamento','danger'); return; }
+
+  const btn=document.getElementById('pm-save-btn');
+  btn.textContent='Guardando...'; btn.disabled=true;
+  setSyncDot('syncing');
+
+  const payload={ name, description:desc, department_id:deptId, status:selectedStatus };
+
+  try{
+    if(editingProjId){
+      const { error } = await sb.from('projects').update(payload).eq('id', editingProjId);
+      if(error) throw error;
+      const idx=STATE.projects.findIndex(p=>p.id===editingProjId);
+      if(idx>-1) STATE.projects[idx]={...STATE.projects[idx],...payload};
+      toast('Proyecto actualizado','success');
+    } else {
+      const { data, error } = await sb.from('projects').insert({...payload}).select().single();
+      if(error) throw error;
+      STATE.projects.unshift(data);
+      toast('Proyecto creado','success');
+    }
+    setSyncDot('synced');
+    closeProjModal();
+    renderHome();
+    if(editingProjId) renderProjDetail();
+  } catch(e){
+    setSyncDot('error');
+    toast('Error: '+e.message,'danger');
+  }
+  btn.textContent='Guardar proyecto'; btn.disabled=false;
+}
+
+async function deleteCurrentProj(){
+  const ok=await openConfirm('Eliminar proyecto','¿Eliminar este proyecto y todas sus entradas? Esta acción no se puede deshacer.');
+  if(!ok) return;
+  setSyncDot('syncing');
+  try{
+    const { error }=await sb.from('projects').delete().eq('id', editingProjId);
+    if(error) throw error;
+    STATE.projects=STATE.projects.filter(p=>p.id!==editingProjId);
+    delete STATE.entries[editingProjId];
+    setSyncDot('synced');
+    toast('Proyecto eliminado');
+    closeProjModal();
+    showScreen('screen-home');
+    renderHome();
+  } catch(e){
+    setSyncDot('error');
+    toast('Error: '+e.message,'danger');
+  }
+}
+
+function closeProjModal(){ hideModal('modal-proj') }
+
+/* ══════════════════════════════════════════
+   PROJECT DETAIL
+══════════════════════════════════════════ */
+async function openProject(id){
+  STATE.currentProj=id;
+  const p=STATE.projects.find(x=>x.id===id);
+  if(!p) return;
+  const dept=STATE.departments.find(d=>d.id===p.department_id);
+  document.getElementById('proj-detail-name').textContent=p.name;
+  document.getElementById('proj-detail-dept').textContent=(dept?dept.name:'')+(p.status?' · '+p.status:'');
+  showScreen('screen-proj');
+  renderEntriesSkeleton();
+  await loadEntries(id);
+}
+
+function renderProjDetail(){
+  const p=STATE.projects.find(x=>x.id===STATE.currentProj);
+  if(!p) return;
+  const dept=STATE.departments.find(d=>d.id===p.department_id);
+  document.getElementById('proj-detail-name').textContent=p.name;
+  document.getElementById('proj-detail-dept').textContent=(dept?dept.name:'')+(p.status?' · '+p.status:'');
+  renderEntries();
+}
+
+function renderEntriesSkeleton(){
+  document.getElementById('proj-body').innerHTML=
+    '<div class="skeleton skel-entry"></div>'.repeat(4);
+}
+
+function renderEntries(){
+  const entries=STATE.entries[STATE.currentProj]||[];
+  const body=document.getElementById('proj-body');
+  if(entries.length===0){
+    body.innerHTML=`<div class="empty">
+      <div class="empty-icon">📋</div>
+      <div class="empty-title">Sin entradas aún</div>
+      <div class="empty-sub">Toca el + para registrar lo que hiciste hoy con este proyecto.</div>
+    </div>`;
+    return;
+  }
+
+  let html='';
+  entries.forEach(e=>{
+    const atts=e.attachments||[];
+    html+=`<div class="entry-card" id="entry-${e.id}">
+      <div class="entry-header">
+        <div class="entry-ts">${fmtDate(e.created_at)}</div>
+        <div class="entry-actions">
+          <button class="btn-sm danger" onclick="deleteEntry('${e.id}')">✕</button>
+        </div>
+      </div>
+      <div class="entry-content">${escHtml(e.content)}</div>
+      ${atts.length>0?`<div class="attach-list">${atts.map(a=>attachmentHtml(a)).join('')}</div>`:''}
+    </div>`;
+  });
+  body.innerHTML=html;
+}
+
+function attachmentHtml(a){
+  return `<div class="attachment-row" onclick="downloadAttachment('${a.id}','${escHtml(a.file_name)}','${a.storage_path}')">
+    <span class="attachment-icon">${fileIcon(a.mime_type)}</span>
+    <span class="attachment-name">${escHtml(a.file_name)}</span>
+    <span class="attachment-size">${fmtSize(a.size_bytes||0)}</span>
+    <span style="color:var(--accent);font-size:12px">↓</span>
+  </div>`;
+}
+
+async function downloadAttachment(id, name, path){
+  try{
+    const { data, error }=await sb.storage.from(STORAGE_BUCKET).download(path);
+    if(error) throw error;
+    const url=URL.createObjectURL(data);
+    const a=document.createElement('a'); a.href=url; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+  } catch(e){
+    toast('Error al descargar: '+e.message,'danger');
+  }
+}
+
+async function deleteEntry(id){
+  const ok=await openConfirm('Eliminar entrada','¿Eliminar esta entrada y sus adjuntos?');
+  if(!ok) return;
+  setSyncDot('syncing');
+  try{
+    // get attachments first to delete from storage
+    const entry=(STATE.entries[STATE.currentProj]||[]).find(e=>e.id===id);
+    if(entry && entry.attachments && entry.attachments.length>0){
+      const paths=entry.attachments.map(a=>a.storage_path);
+      await sb.storage.from(STORAGE_BUCKET).remove(paths);
+    }
+    const { error }=await sb.from('entries').delete().eq('id',id);
+    if(error) throw error;
+    STATE.entries[STATE.currentProj]=(STATE.entries[STATE.currentProj]||[]).filter(e=>e.id!==id);
+    setSyncDot('synced');
+    toast('Entrada eliminada');
+    renderEntries();
+  } catch(e){
+    setSyncDot('error');
+    toast('Error: '+e.message,'danger');
+  }
+}
+
+/* ══════════════════════════════════════════
+   ENTRY MODAL
+══════════════════════════════════════════ */
+function openEntryModal(){
+  STATE.pendingFiles=[];
+  document.getElementById('em-content').value='';
+  document.getElementById('file-preview-list').innerHTML='';
+  showModal('modal-entry');
+  setTimeout(()=>document.getElementById('em-content').focus(),300);
+}
+
+function closeEntryModal(){ hideModal('modal-entry') }
+
+function handleFiles(files){ [...files].forEach(addPendingFile) }
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+}
+
+function addPendingFile(file){
+  const id=uid();
+  STATE.pendingFiles.push({ id, file });
+  const list=document.getElementById('file-preview-list');
+  const row=document.createElement('div');
+  row.id='fp-'+id;
+  row.style.cssText='display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px';
+  row.innerHTML=`<span style="font-size:16px">${fileIcon(file.type)}</span>
+    <span style="font-family:var(--mono);font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(file.name)}</span>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fmtSize(file.size)}</span>
+    <button onclick="removePendingFile('${id}')" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer">✕</button>`;
+  list.appendChild(row);
+}
+
+function removePendingFile(id){
+  STATE.pendingFiles=STATE.pendingFiles.filter(f=>f.id!==id);
+  const el=document.getElementById('fp-'+id);
+  if(el) el.remove();
+}
+
+async function saveEntry(){
+  const content=document.getElementById('em-content').value.trim();
+  if(!content){ toast('Escribe algo antes de guardar','danger'); return; }
+
+  const btn=document.getElementById('em-save-btn');
+  btn.textContent='Guardando...'; btn.disabled=true;
+  setSyncDot('syncing');
+
+  try{
+    // 1. Insert entry
+    const { data:entry, error:eErr }=await sb.from('entries').insert({
+      project_id: STATE.currentProj,
+      content,
+      user_id: currentUser.id
+    }).select().single();
+    if(eErr) throw eErr;
+
+    // 2. Upload attachments
+    const attachments=[];
+    for(const pf of STATE.pendingFiles){
+      const ext=pf.file.name.split('.').pop();
+      const path=`${currentUser.id}/${STATE.currentProj}/${entry.id}/${uid()}.${ext}`;
+      const { error:upErr }=await sb.storage.from(STORAGE_BUCKET).upload(path, pf.file);
+      if(upErr) throw upErr;
+      attachments.push({ entry_id:entry.id, file_name:pf.file.name, storage_path:path, mime_type:pf.file.type, size_bytes:pf.file.size });
+    }
+
+    if(attachments.length>0){
+      const { data:attData, error:attErr }=await sb.from('attachments').insert(attachments).select();
+      if(attErr) throw attErr;
+      entry.attachments=attData;
+    } else {
+      entry.attachments=[];
+    }
+
+    // 3. Prepend to local state
+    if(!STATE.entries[STATE.currentProj]) STATE.entries[STATE.currentProj]=[];
+    STATE.entries[STATE.currentProj].unshift(entry);
+    setSyncDot('synced');
+    toast('Entrada guardada ✓','success');
+    closeEntryModal();
+    renderEntries();
+  } catch(e){
+    setSyncDot('error');
+    toast('Error: '+e.message,'danger');
+  }
+  btn.textContent='Guardar entrada'; btn.disabled=false;
+}
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+(async()=>{
+  // Detect invite link hash BEFORE SDK consumes it
+  const hashStr=window.location.hash;
+  const isInvite=hashStr.includes('type=invite')||hashStr.includes('type=recovery');
+
+  sb.auth.onAuthStateChange(async(event, session)=>{
+    if(event==='SIGNED_IN' && isInvite){
+      const meta=session.user.user_metadata||{};
+      if(!meta.password_set){
+        showScreen('screen-setpass'); return;
+      }
+    }
+    if(event==='SIGNED_OUT'){ currentUser=null; showScreen('screen-login'); }
+  });
+
+  const { data:{ session } }=await sb.auth.getSession();
+  if(session){
+    await onLogin(session.user);
+  } else {
+    showScreen('screen-login');
+  }
+})();
+
+/* ══════════════════════════════════════════
+   SERVICE WORKER REGISTRATION
+══════════════════════════════════════════ */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js')
+      .catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
