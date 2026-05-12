@@ -572,9 +572,32 @@ async function doSetPassword(){
   if(p1!==p2){ err.textContent='Las contraseñas no coinciden.'; err.classList.add('show'); return; }
   err.classList.remove('show');
   btn.textContent='Guardando...'; btn.disabled=true;
-  const { data, error } = await sb.auth.updateUser({ password:p1, data:{ password_set:true } });
+
+  // Get current session to retrieve email before updating
+  const { data:{ session:currentSession } } = await sb.auth.getSession();
+  const userEmail = currentSession?.user?.email;
+
+  const { error } = await sb.auth.updateUser({ password:p1, data:{ password_set:true } });
   btn.textContent='Guardar y entrar →'; btn.disabled=false;
-  if(error){ err.textContent=error.message; err.classList.add('show'); return; }
+
+  if(error){
+    // Supabase throws this when the new password equals the temporary one from the invite link.
+    // Solution: sign in directly with the password the user just typed.
+    if(error.message.toLowerCase().includes('different from the old password') || error.message.toLowerCase().includes('same password')){
+      if(!userEmail){ err.textContent='No se pudo obtener el email. Intenta iniciar sesión manualmente.'; err.classList.add('show'); return; }
+      const { data:signInData, error:signInError } = await sb.auth.signInWithPassword({ email:userEmail, password:p1 });
+      if(signInError){ err.textContent='La contraseña ya estaba en uso. Intenta con otra.'; err.classList.add('show'); return; }
+      await onLogin(signInData.user);
+      return;
+    }
+    err.textContent=error.message; err.classList.add('show'); return;
+  }
+
+  // Password updated — sign in fresh to get clean session
+  if(userEmail){
+    const { data:signInData } = await sb.auth.signInWithPassword({ email:userEmail, password:p1 });
+    if(signInData?.user){ await onLogin(signInData.user); return; }
+  }
   const { data:{ session } } = await sb.auth.getSession();
   if(session) await onLogin(session.user);
 }
