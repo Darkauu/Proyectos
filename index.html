@@ -236,6 +236,7 @@ a{color:var(--accent);text-decoration:none}
     <span style="flex:1"></span>
     <div class="sync-dot" id="sync-dot" title="Sincronización"></div>
     <div class="user-chip" id="user-chip" onclick="confirmLogout()">...</div>
+    <button class="btn-icon" onclick="showScreen('screen-depts')" title="Departamentos" style="font-size:16px">⚙</button>
   </div>
   <div class="scroll-body" id="home-body">
     <!-- dept chips + project list rendered here -->
@@ -346,6 +347,38 @@ a{color:var(--accent);text-decoration:none}
   </div>
 </div>
 
+<!-- ══════════ SCREEN: DEPARTAMENTOS ══════════ -->
+<div class="screen" id="screen-depts">
+  <div class="topbar">
+    <button class="btn-icon btn-back" onclick="showScreen('screen-home')" style="font-size:20px">←</button>
+    <div class="topbar-title">Departamentos</div>
+    <div class="sync-dot" id="sync-dot-depts"></div>
+  </div>
+  <div class="scroll-body" id="depts-body"></div>
+  <button class="fab" onclick="openDeptModal()">+</button>
+</div>
+
+<!-- ══════════ MODAL: DEPT CRUD ══════════ -->
+<div class="modal-backdrop" id="modal-dept">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="dept-modal-title">Nuevo departamento</div>
+      <button class="btn-icon" onclick="closeDeptModal()" style="font-size:18px">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label class="flabel">NOMBRE</label>
+        <input id="dm-name" placeholder="Ej: Recursos Humanos" onkeydown="if(event.key==='Enter')saveDept()">
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:10px">
+      <button class="btn-danger" id="dm-delete-btn" onclick="deleteCurrentDept()" style="display:none">Eliminar</button>
+      <button class="btn-primary" id="dm-save-btn" onclick="saveDept()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ══════════════════════════════════════════
    CONFIG — reemplazar con tus credenciales
@@ -406,10 +439,11 @@ function fileIcon(mime){
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  if(id==='screen-depts') renderDepts();
 }
 
 function setSyncDot(state){ // 'syncing'|'synced'|'error'|'idle'
-  ['sync-dot','sync-dot-proj'].forEach(id=>{
+  ['sync-dot','sync-dot-proj','sync-dot-depts'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
     el.className='sync-dot '+state;
@@ -915,6 +949,110 @@ async function saveEntry(){
     toast('Error: '+e.message,'danger');
   }
   btn.textContent='Guardar entrada'; btn.disabled=false;
+}
+
+/* ══════════════════════════════════════════
+   DEPARTMENTS CRUD
+══════════════════════════════════════════ */
+let editingDeptId = null;
+
+function renderDepts(){
+  const body = document.getElementById('depts-body');
+  const depts = STATE.departments;
+
+  if(depts.length === 0){
+    body.innerHTML=`<div class="empty">
+      <div class="empty-icon">🏢</div>
+      <div class="empty-title">Sin departamentos</div>
+      <div class="empty-sub">Toca + para agregar el primero.</div>
+    </div>`;
+    return;
+  }
+
+  let html='';
+  depts.forEach(d=>{
+    const projCount = STATE.projects.filter(p=>p.department_id===d.id).length;
+    html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:500">${escHtml(d.name)}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px">${projCount} proyecto${projCount!==1?'s':''}</div>
+      </div>
+      <button class="btn-secondary" onclick="openDeptModal('${d.id}')" style="padding:8px 14px;font-size:12px">Editar</button>
+    </div>`;
+  });
+  body.innerHTML=html;
+}
+
+function openDeptModal(id){
+  editingDeptId = id || null;
+  document.getElementById('dept-modal-title').textContent = id ? 'Editar departamento' : 'Nuevo departamento';
+  const deleteBtn = document.getElementById('dm-delete-btn');
+  if(id){
+    const d = STATE.departments.find(x=>x.id===id);
+    document.getElementById('dm-name').value = d ? d.name : '';
+    deleteBtn.style.display='flex';
+  } else {
+    document.getElementById('dm-name').value = '';
+    deleteBtn.style.display='none';
+  }
+  showModal('modal-dept');
+  setTimeout(()=>document.getElementById('dm-name').focus(), 300);
+}
+
+function closeDeptModal(){ hideModal('modal-dept') }
+
+async function saveDept(){
+  const name = document.getElementById('dm-name').value.trim();
+  if(!name){ toast('El nombre es obligatorio','danger'); return; }
+  const btn = document.getElementById('dm-save-btn');
+  btn.textContent='Guardando...'; btn.disabled=true;
+  setSyncDot('syncing');
+  try{
+    if(editingDeptId){
+      const { error } = await sb.from('departments').update({ name }).eq('id', editingDeptId);
+      if(error) throw error;
+      const idx = STATE.departments.findIndex(d=>d.id===editingDeptId);
+      if(idx>-1) STATE.departments[idx].name = name;
+      toast('Departamento actualizado','success');
+    } else {
+      const { data, error } = await sb.from('departments').insert({ name }).select().single();
+      if(error) throw error;
+      STATE.departments.push(data);
+      STATE.departments.sort((a,b)=>a.name.localeCompare(b.name));
+      toast('Departamento creado','success');
+    }
+    setSyncDot('synced');
+    closeDeptModal();
+    renderDepts();
+    renderHome();
+  } catch(e){
+    setSyncDot('error');
+    toast('Error: '+e.message,'danger');
+  }
+  btn.textContent='Guardar'; btn.disabled=false;
+}
+
+async function deleteCurrentDept(){
+  const projCount = STATE.projects.filter(p=>p.department_id===editingDeptId).length;
+  const msg = projCount > 0
+    ? `Este departamento tiene ${projCount} proyecto${projCount!==1?'s':''} asignado${projCount!==1?'s':''}. ¿Eliminar igual? Los proyectos quedarán sin departamento.`
+    : '¿Eliminar este departamento?';
+  const ok = await openConfirm('Eliminar departamento', msg);
+  if(!ok) return;
+  setSyncDot('syncing');
+  try{
+    const { error } = await sb.from('departments').delete().eq('id', editingDeptId);
+    if(error) throw error;
+    STATE.departments = STATE.departments.filter(d=>d.id!==editingDeptId);
+    toast('Departamento eliminado');
+    setSyncDot('synced');
+    closeDeptModal();
+    renderDepts();
+    renderHome();
+  } catch(e){
+    setSyncDot('error');
+    toast('Error: '+e.message,'danger');
+  }
 }
 
 /* ══════════════════════════════════════════
